@@ -182,6 +182,7 @@ The graph above shows that the bed number is positively related to the nurse num
 Also, we noticed that low infection risk happens when there are few nurses and beds, 
 which may mean those small hospitals are most likely to handle low-risk patients, 
 while those large hospitals will have more chance to handle high-risk patients.
+For the possible danger of having such a colour scale is that it is not suitable for those who are colourblind or those who are not sensible to the colours.
 
 ## 2.6 Convert graph from step 3 to Plotly with ggplotly function
 
@@ -203,7 +204,7 @@ Compared to the graph in 2.3, there are two extra vertical lines at the beginnin
 
 Please check appendix for the code.
 
-We use pipeline to connect all the operations including data read,outliers calculation,histogram and outlier points.
+We use pipeline to connect all the operations including data read,outliers calculation,histogram and outlier points etc.
 
 ```{r 2.7, warning=FALSE, echo=FALSE}
 ###########################  Code For Assignment 2.7 ###########################
@@ -235,7 +236,7 @@ graph2.7
 
 Please check appendix for the code.
 
-Shiny app is embedded in this report.
+Shiny app is embedded in this html report.
 
 ```{r 2.8, echo=FALSE}
 ###########################  Code For Assignment 2.8 ###########################
