@@ -1,0 +1,449 @@
+---
+title: "732A98-Visualization Lab 2"
+author: 
+  - Qinyuan Qi(qinqi464)
+date: "`r Sys.Date()`" 
+header-includes:
+  - \usepackage{pdfpages}
+output: html_document
+---
+
+# Assignment 1
+```{r setup1, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 1 ########################
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+```
+
+## 1.1 Question:
+
+Create a scatterplot in Ggplot2 that shows dependence of Palmitic on Oleic in which observations are colored by Linoleic. Create also a similar scatter plot in which you divide Linoleic variable into four classes (use cut_interval() ) and map the discretized variable to color instead. How easy/difficult is it to analyze each of these plots? What kind of perception problem is demonstrated by this experiment?
+
+### Answer:
+
+Compare the 2 plots below, for the first plot, when we use the Linoleic value as the colour value directly, it becomes tough to identify which group the point belongs to, because the points use a similar colour. While for the second plot, we cut the Linoleic value to 4 groups, it becomes much easier to know which group a point belongs to.
+
+Humans are not good at identifying similar colours, especially when we mix lots of colours in one plot. So when we plot something, we 
+should limit the colour number used, and it's better to use different colours instead of similar colours.
+
+```{r 1.1, echo=FALSE}
+###########################  Code For Assignment 1.1 ###########################
+data <- read.csv("olive.csv",header = TRUE)
+
+# rename the first column to id
+data <- data %>% rename(id = colnames(data)[1])
+
+df <- data %>% select(palmitic,oleic,linoleic) 
+
+graph_1.1_1 <-  ggplot(data = df, aes(x=oleic,y=palmitic,color = linoleic)) +
+  geom_point() +
+  labs(title = 'Scatter Plot group by Linoleic', x = 'Oleic', y = 'Palmitic', color = "Linoleic") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+
+graph_1.1_1
+
+df$interval <- cut_interval(df$linoleic, n = 4)
+
+graph_1.1_2 <-  ggplot(data = df, aes(x=oleic,y=palmitic,color = interval)) +
+  geom_point() +
+  labs(title = 'Scatter Plot group by Linoleic', x = 'Oleic', y = 'Palmitic', color = "Linoleic") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+graph_1.1_2
+```
+
+## 1.2 Question:
+
+Create scatterplots of Palmitic vs Oleic in which you map the discretized Linoleic with four classes to:
+
+a. Color
+
+b. Size
+
+c. Orientation angle (use geom_spoke() )
+
+State in which plots it is more difficult to differentiate between the categories and connect your findings to perception metrics (i.e. how many bits can be decoded by a specific aesthetics)
+
+### Answer:
+
+Regarding the bits can be decoded by a specific aesthetics in our case, according to the formula: levels number = 2^bits, and we also know that
+we have 4 distinct groups for all the plots, so for the colour, we can decode 2 bits, for the size, we can decode 2 bits, and for the orientation angle, we can decode 2 bits.
+
+Compare the metrics provided on the ppt, we know that size can provide 4-5 levels which is 2.2 bits, colour(hue) can provide 10 levels which is 3.1 bits, line orientation can be encoded to 3 bits, and line length can be encoded to 2.8 bits. Since 2 is smaller than all of the bits mentioned, we know that all of the aesthetics can be used to differentiate between the categories.
+
+From the plots below, we found that after changing the size of the point to a relatively smaller scale, all 3 plots can be used to differentiate different groups, however, the orientation angle is still the more difficult one to differentiate between the categories. Because even if we can use different angles to show distinct groups, we still not know which group mapping to a specific angle(in a static image), besides, ggplot does not support using an arrow as a legend natively, so it is not suitable to use ggplot and geom_spoke to identify groups in our case.
+
+```{r 1.2, echo=FALSE,warning=FALSE}
+###########################  Code For Assignment 1.2 ###########################
+df$interval <- cut_interval(df$linoleic, n = 4)
+
+graph_1.2.1 <-  ggplot(data = df, aes(x=oleic,y=palmitic,color = interval)) +
+  geom_point() +
+  labs(title = 'Scatter Plot group by Linoleic (Color)', x = 'Oleic', y = 'Palmitic', color = "Linoleic") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+graph_1.2.1
+
+# change the size of the points
+graph_1.2.2_1 <-  ggplot(data = df, aes(x=oleic,y=palmitic,size = interval)) +
+  geom_point() +
+  labs(title = 'Scatter Plot group by Linoleic (size)', x = 'Oleic', y = 'Palmitic', size = "Linoleic") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+
+# change the size of the points, change the size of the points to make it clear
+graph_1.2.2_2 <-  ggplot(data = df, aes(x=oleic,y=palmitic,size = interval)) +
+  geom_point() +
+  # scale the size of point to make it more clear
+  scale_size_manual(values = c(0.05, 0.5, 1, 2)) +  
+  labs(title = 'Scatter Plot group by Linoleic (smaller point size)', x = 'Oleic', y = 'Palmitic', size = "Linoleic") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+
+graph_1.2.2_1
+graph_1.2.2_2 
+
+df$interval_numeric <- as.numeric(df$interval)
+
+graph_1.2.3 <-  ggplot(data = df, aes(x=oleic,y=palmitic)) +
+  # resize the point to make it more clear
+  geom_point(size = 0.25) +
+  geom_spoke(aes(angle = interval_numeric,radius = 50)) +
+  labs(title = 'Scatter Plot group by Linoleic (orientation angle)', x = 'Oleic', y = 'Palmitic') +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+graph_1.2.3
+```
+
+## 1.3 Question:
+
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by numeric values of Region. What is wrong with such a plot? Now create a similar kind of plot in which Region is a categorical variable. How quickly can you identify decision boundaries? Does preattentive or attentive mechanism make it possible?
+
+### Answer:
+
+The first plot which use numeric values of Region as colour is not correct, because the region is a categorical variable(although it is written as integer number), such a plot will misleading the user.
+
+For the second plot, we can easily identify decision boundaries. 
+
+Preattentive or attentive mechanism make it possible to identify decision boundaries. Because the colour, size and shape are preattentive mechanisms, they can be processed in the first stage. In our case, we can use colour to distinguish different regions immediately.
+
+
+```{r 1.3, echo=FALSE}
+###########################  Code For Assignment 1.3 ###########################
+df1.3 <- data %>% select(oleic,eicosenoic,Region) 
+df1.3$Region <- as.numeric(df1.3$Region)
+
+graph_1.3.1 <-  ggplot(data =df1.3, aes(x=oleic,y=eicosenoic,color=Region)) +
+  geom_point() +
+  labs(title = 'Scatter Plot color by Region(numeric)', x = 'Oleic', y = 'Eicosenoic',color = "Region") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+graph_1.3.1
+
+df1.3$Region <- as.factor(df1.3$Region)
+
+graph_1.3.2 <-  ggplot(data =df1.3, aes(x=oleic,y=eicosenoic,color=Region)) +
+  geom_point() +
+  labs(title = 'Scatter Plot color by Region(factor)', x = 'Oleic', y = 'Eicosenoic',color = "Region") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+graph_1.3.2
+
+```
+
+## 1.4 Question:
+
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by a discretized Linoleic (3 classes), shape is defined by a discretized Palmitic (3 classes) and size is defined by a discretized Palmitoleic (3 classes). How difficult is it to differentiate between $27=3*3*3$ different types of observations? What kind of perception problem is demonstrated by this graph?
+
+### Answer:
+
+From the plot below, it's very hard to identify 27 different types. Several same colour points stack together which makes it hard to identify different shape and size.
+
+The main perception problem here is the overload of visual cues, especially when the plot does not show clear boundaries between clusters.
+
+```{r 1.4, echo=FALSE,warning=FALSE}
+###########################  Code For Assignment 1.4 ###########################
+df1.4 <- data %>% select(oleic,eicosenoic,linoleic,palmitic,palmitoleic) 
+df1.4$linoleic_interval <- cut_interval(df1.4$linoleic, n = 3)
+df1.4$palmitic_interval <- cut_interval(df1.4$palmitic, n = 3)
+df1.4$palmitoleic_interval <- cut_interval(df1.4$palmitoleic, n = 3)
+
+graph_1.4 <-  ggplot(data =df1.4, aes(x=oleic,y=eicosenoic,color=linoleic_interval,size = palmitoleic_interval)) +
+  geom_point(aes(shape = palmitic_interval)) +
+  labs(title = 'Scatter Plot group by linoleic,palmitic and palmitoleic', x = 'Oleic', y = 'Eicosenoic',
+       color = "Linoleic(Colour)",size = "Palmitoleic(Size)", shape="Palmitic(Shape)") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+graph_1.4
+```
+
+## 1.5 Question:
+
+Create a scatterplot of Oleic vs Eicosenoic in which color is defined by Region, shape is defined by a discretized Palmitic (3 classes) and size is defined by a discretized Palmitoleic (3 classes). Why is it possible to clearly see a decision boundary between Regions despite many aesthetics are used? Explain this phenomenon from the perspective of Treisman’s theory.
+
+### Answer:
+
+According to Treisman’s Feature Integration Theory, when people view visual stimuli, they will two stages to find the pattern, in the first stage, it will process simple features (like colour, shape, or size) in parallel, in the second stage, all the result of the first stage will integrate to find patterns existed in the visual stimuli.
+
+Colour is a highly salient feature and can be processed in the first stage, if a boundary can be found easily between different groups by using the colour, the colour will become the dominant factor, while the size and shape are relatively hard to process compared to the colours(in case they did not show clear boundary).
+
+In our case, when we use different colours to distinguish different Regions, we find a clear boundary. Compared to the previous plot in 1.4, it's more suitable to use colour as a main factor to separate the data points.
+
+```{r 1.5, echo=FALSE,warning=FALSE}
+###########################  Code For Assignment 1.5 ###########################
+df1.5 <- data %>% select(oleic,eicosenoic,Region,palmitic,palmitoleic) 
+df1.5$palmitic_interval <- cut_interval(df1.5$palmitic, n = 3)
+df1.5$palmitoleic_interval <- cut_interval(df1.5$palmitoleic, n = 3)
+
+graph_1.5 <-  ggplot(data =df1.5, aes(x=oleic,y=eicosenoic,color=as.factor(Region),size = palmitoleic_interval)) +
+  geom_point(aes(shape = palmitic_interval)) +
+  labs(title = 'Scatter Plot group by linoleic,palmitic and palmitoleic', x = 'Oleic', y = 'Eicosenoic',
+       color = "Region(Colour)",size = "Palmitoleic(Size)", shape="Palmitic(Shape)") +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Centrer the title
+  )
+graph_1.5
+```
+
+## 1.6 Question:
+
+Use Plotly to create a pie chart that shows the proportions of oils coming from different Areas. Hide labels in this plot and keep only hover-on labels. Which problem is demonstrated by this graph?
+
+### Answer:
+
+The problem in the following pie chart is the default pie chart does not have the label displayed by default(only the hover-on label).
+
+If the user does not use the mouse to hover over the plot, he/she needs to match the colour of one sector area to the colour of the legend to find out the area name, it maybe hard if we use several very closed colours in a pie chart. So it is better to add labels to a pie chart instead of hover-on information.
+
+In our pie chart, there have several perception problems.
+
+1. Recognizing: It is hard to recognize the area name without hover-on information, because the colour is the only way to identify the area name.
+2. Interpreting (binding to knowledge): After recognize the area name corresponding to the colour segments, user are still forced to interpret the data by guess the area size(percentage of that segment). Like which segment is the biggest one, which is the smallest one(in our case, the smallest one is relative hard to find by just look at the pie chart), etc.
+
+```{r 1.6, echo=FALSE}
+###########################  Code For Assignment 1.6 ###########################
+df1.6 <- data %>% select(Area)
+df1.6$Area <- as.factor(df1.6$Area)
+
+area_info <- as.data.frame(table(df1.6$Area))
+colnames(area_info) <- c("Area","Count")
+
+graph_1.6 <- plot_ly(area_info, labels = ~Area, values = ~Count, type = 'pie', textinfo="none")
+graph_1.6
+```
+
+## 1.7 Question:
+
+Create a 2d-density contour plot with ggplot2 in which you show dependence of Linoleic vs Eicosenoic. Compare the graph to the scatterplot using the same variables and comment why this contour plot can be misleading.
+
+### Answer:
+
+A 2D-density contour plot is used to show the density of points in different regions, however, the data is smoothed to produce 
+the contour plot line, In the case of no original points coexisting in the plot, the contour plot may obscure important details 
+in the data.
+
+Meanwhile, since the 2D-density contour plot only focuses on the density of the points, it may lose the individual information.
+
+Finally, a contour plot may suggest that there exists a cluster that does not exist in the original data (because of misuse of some density 
+estimation algorithms), this will also mislead the user.
+
+```{r 1.7, echo=FALSE}
+###########################  Code For Assignment 1.7 ###########################
+df1.7 <- data %>% select(linoleic,eicosenoic)
+
+graph_1.7.1 <-  ggplot(data =df1.7, aes(x=linoleic,y=eicosenoic)) +
+  geom_point() +
+  labs(title = 'Scatter Plot', x = 'Linoleic', y = 'Eicosenoic') +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+graph_1.7.2 <-  ggplot(data =df1.7, aes(x=linoleic,y=eicosenoic)) +
+  geom_density_2d() + 
+  labs(title = '2D density', x = 'Linoleic', y = 'Eicosenoic') +
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  )
+graph_1.7.1
+graph_1.7.2
+```
+
+
+# Assignment 2
+
+The data set baseball-2016.xlsx contains information about the scores of baseball teams in USA in 2016
+
+```{r setup2, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 2 ########################
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(MASS)
+library(gridExtra)
+```
+
+## 2.1 Question:
+
+Load the file to R and answer whether it is reasonable to scale these data in order to perform a multidimensional scaling (MDS).
+
+### Answer:
+
+Please check the appendix for the code.
+
+From the data, we found that the value of column AB is around 5500, but value of column BAvg is only around 0.2, 
+
+So it is reasonable to rescale the data in a similar scale before we perform MDS.
+
+```{r 2.1, echo=FALSE}
+###########################  Code For Assignment 2.1 ###########################
+data2 <- read.xlsx(file = "baseball-2016.xlsx",sheetName = "Sheet1")
+```
+
+## 2.2 Question:
+
+Write an R code that performs a non-metric MDS with Minkowski distance=2 of the data (numerical columns) into two dimensions. Visualize the resulting observations in Plotly as a scatter plot in which observations are colored by League. Does it seem to exist a difference between the leagues according to the plot? Which of the MDS components seem to provide the best differentiation between the Leagues? Which baseball teams seem to be outliers?
+
+### Answer:
+
+Please check the appendix for the code.
+
+The plot below shows a small difference between 2 Leagues. Clubs in League AL(Red) tend to have a small V1 component value but not for the V2 component. Clubs in League NL(Blue) scatted relatively equally across the space.
+
+According to the plot, we think component V2 provide the best differentiation between the Leagues because there are no red points below V2=2, which can separate easily, but this is not the case for V1.
+
+We also found a red point at the very left side (Boston Red Sox), which seems an outlier.
+
+```{r 2.2, echo=FALSE,warning=FALSE}
+###########################  Code For Assignment 2.2 ###########################
+data2.scaled <- scale(data2[-c(1,2)])
+
+# dist is a function of stats package to computes distance matrix using specified method
+data2.dist <- dist(x = data2.scaled, method = "minkowski")
+
+# isoMDS is a function of MASS, which is one form of non-metric multidimensional scaling
+# set k=2 
+data2.mds <- isoMDS(d = data2.dist, k = 2)
+
+# get k-column vector of the fitted configuration
+coords <- data2.mds$points
+
+coordsMDS <- as.data.frame(coords)
+coordsMDS$Team <- data2$Team
+coordsMDS$League <- data2$League
+
+# V1 V2 is the column name generated by isoMDS
+plot_ly(coordsMDS, x=~V1, y=~V2, type="scatter", hovertext=~Team, color=~League, mode="markers", colors=c("red","blue")) 
+```
+
+
+## 2.3 Question:
+
+Use Plotly to create a Shepard plot for the MDS performed and comment about how successful the MDS was. Which observation pairs were hard for the MDS to map successfully?
+
+### Answer:
+
+According to the Shepard plot for the MDS below, the scatter have a pattern of a monotonic curve, so the quality of MDS fit is pretty good. But those points that far from the centre of the trend will be treated as pairs that are hard for the MDS to map, the following observation pairs are hard for the MDS to map.
+
+1. Minnesota Twins vs Aizona Diamondbacks
+2. Oakland Athletics vs Milwaukee Brewers
+ 
+```{r 2.3, echo=FALSE}
+###########################  Code For Assignment 2.3 ###########################
+# main code is modified from the source code provided on the course page
+
+# Shepard from MASS package and it is one form of non-metric multidimensional scaling
+data2.sh <- Shepard(data2.dist, data2.mds$points)
+delta <-as.numeric(data2.dist)
+
+D <- as.numeric(dist(data2.mds$points, method = "minkowski"))
+
+n <- nrow(data2.mds$points)
+index <- matrix(1:n, nrow=n, ncol=n)
+index1 <- as.numeric(index[lower.tri(index)])
+
+index <- matrix(1:n, nrow=n, ncol=n, byrow = T)
+index2 <- as.numeric(index[lower.tri(index)])
+
+graph_2.3 <- plot_ly()%>%
+  add_markers(x=~delta, y=~D, hoverinfo = 'text',
+              text = ~paste('Team 1: ',data2$Team[index1],
+                            'vs Team 2: ', data2$Team[index2]))%>%
+  #if non-metric MDS involved
+  add_lines(x=~data2.sh$x, y=~data2.sh$yf)
+graph_2.3
+```
+
+## 2.4 Question:
+
+Produce series of scatter plots in which you plot the MDS variable that was the best in the differentiation between the leagues in step 2 against all other numerical variables of the data. Pick up two scatter plots that seem to show the strongest (positive or negative) connection between the variables and include them into your report. Find some information about these variables in Google – do they appear to be important in scoring the baseball teams? Provide some interpretation for the chosen MDS variable.
+
+### Answer:
+
+According to the result of 2.2, we know that V2 is the component we choose to separate the different leagues.
+
+HR has positive relationship with V2 and SH has negative relationship with V2.
+
+
+
+According to result of baseball stat abbreviations
+
+HR – Home runs: The number of home runs a player has hit. These include inside-the-park home runs.
+
+SH - Sacrifice Bunts: The number of 'sacrifice hits' a player has made throughout the season. 
+
+From the information above, we can find that HR is very important factors in scoring the baseball teams, because more home run means more scores and more chance to win. Regarding the SH value, because each team only gets 27 "outs" in a game, if a team heavily rely on sacrificing "out" to move a runner gives up one of those "outs", they might be using up outs more quickly without generating runs efficiently. Both of them explain the relationship between the variables and V2.
+
+Plots as below.
+
+```{r 2.4, echo=FALSE}
+###########################  Code For Assignment 2.4 ###########################
+# make a new data frame consist of mds and original data(join by Team and League)
+
+df_2.4 <- coordsMDS %>% left_join(data2, by = c("Team","League"))
+
+y_variables <- c("Won","Lost","Runs.per.game","HR.per.game","AB","Runs","Hits",#7
+                 "X2B","X3B","HR","RBI","StolenB","CaughtS","BB","SO","BAvg",#16
+                 "OBP","SLG","OPS","TB","GDP","HBP","SH","SF","IBB","LOB")
+
+# 26 plots
+plots <- list()
+
+for (i in 1:length(y_variables)) {
+  col_name <- y_variables[i]
+
+  plt <- plot_ly(data = df_2.4, 
+                 x = ~V2, 
+                 y = ~.data[[col_name]], 
+                 type = 'scatter', 
+                 mode = 'markers', 
+                 hoverinfo = 'text',
+                 text = ~paste('Team: ',Team,'<br>League: ',League,'<br>',col_name,': ',.data[[col_name]]),
+                 color = ~League,
+                 colors = c("AL" = "red", "NL" = "blue")) %>%
+    layout(title = paste("V2 vs",col_name),
+           xaxis = list(title = "V2"),
+           yaxis = list(title = col_name))
+  plots <- c(plots, list(plt))
+}
+                 
+plots[[10]] # HR
+plots[[23]] # SH
+```
+
+\newpage
+# Appendix: All code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```

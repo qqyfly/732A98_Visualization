@@ -1,0 +1,606 @@
+---
+title: "732A98-Visualization Lab 5"
+author: 
+  - Qinyuan Qi(qinqi464)
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Assignment 1: Network visualization of terrorist connections
+
+Files trainData.dat and trainMeta.dat contain information about a network of the individuals
+involved in the bombing of commuter trains in Madrid on March 11, 2004. The names included were
+of those people suspected of having participated and their relatives.
+
+File trainMeta.dat contains the names of individuals (first column) and Bombing group (second
+column) which shows “1” if person participated in placing the explosives and “0” otherwise.
+According to the order in this file, persons were enumerated 1-70.
+
+File trainData.dat contains information about connections between the individuals (first two
+columns) and strength of ties linking (from one to four):
+
+1. Trust--friendship (contact, kinship, links in the telephone center).
+
+2. Ties to Al Qaeda and to Osama Bin Laden.
+
+3. Co-participation in training camps and/or wars.
+
+4. Co-participation in previous terrorist Attacks (Sept 11, Casablanca).
+
+```{r setup1, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 1 ########################
+
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(seriation)
+library(ggraph)
+library(igraph)
+library(visNetwork)
+```
+
+## 1.1 Question:
+
+1. Use visNetwork package to plot the graph in which
+
+- a. you use strength of links variable
+- b. nodes are colored by Bombing Group.
+- c. size of nodes is proportional to the number of connections ( function strength() from IGRAPH might be useful here)
+- d. you use a layout that optimizes repulsion forces (visPhysics(solver=”repulsion”)).
+- e. all nodes that are connected to a currently selected node by a path of length one are highlighted 
+
+Analyse the obtained network, in particular describe which clusters you see in the network.
+
+### Answer:
+
+From the plot below, we find that the people who belong to the placing explosives group are
+much less than the person in the group who does not place explosives.
+
+We find 2 key persons, Mohamed Chaoui and Jamal Zougam who belong to the group placing explosives and they are connected to most of the people in the graph (most belong to the group of not placing explosives).
+
+We also find that 6 people who belong to the group of not placing explosives are not connected to 
+anyone else in the graph, maybe they only do some individual work.
+
+Meanwhile, the connection between most of the people in the graph is Trust--friendship.
+
+Regarding the clusters, we can see that one small cluster belongs to the group of not placing explosives, and the strength between are Trust--friendship, who are Ivan Granados, Jose Emilio Suarez, Emilio Llamo,
+Antonio Toro, El Gitanillo and Raul Gonzales Perez.
+
+For the bunch of nodes in the middle part, since almost all the yellow nodes here are connected to the two key persons that we just mentioned,all blue nodes will also connect to some yellow nodes,so we can not find a clear clustering condition here.(Strength and Placing explosive are the only two conditions for clustering), so no cluster here.
+
+```{r 1.1, echo=FALSE}
+###########################  Code For Assignment 1.1 ###########################
+# read trainMeta.dat and train.dat
+# to encode special characters in the file, use encoding = "latin1"
+nodes <- read.table("trainMeta.dat", header = FALSE, encoding = "latin1")
+edges <- read.table("trainData.dat", header = FALSE) 
+
+# visNetwork needs at least two pieces of information :
+# Nodes data frame: 
+# Required: id
+# Optional: label, group, title(tooltip), value, color, shape, size, x, y, shadow, image
+
+# Edges data frame:
+# Required: from, to
+# Optional: label, title(tooltip), value, width, length, arrows, dashes, color, smooth, shadow
+
+colnames(nodes) <- c("label", "group")
+# use row number as id
+nodes$id <- rownames(nodes)
+# add tooltip
+nodes$title <- nodes$label
+# order the title so it will appear in order in list box
+nodes <- nodes[order(nodes$title), ]
+
+# Requirement a, use width as strength
+colnames(edges) <- c("from", "to", "width") 
+
+# add tooltip according to strength
+edges$title <- ifelse(edges$width == 1, "1.Trust--friendship",
+                 ifelse(edges$width == 2, "2.Ties to Al Qaeda and to Osama Bin Laden",
+                   ifelse(edges$width == 3, "3.Co-participation in training camps and/or wars",
+                     "4.Co-participation in previous terrorist Attacks"
+                    )
+                  )
+                )
+
+# requirement b, [group] can not change according to the predefined variables requirement
+nodes["group"][nodes["group"] == 1] <- "Placing explosives"
+nodes["group"][nodes["group"] == 0] <- "Not placing explosives"
+
+# The 1st column of vertices is assumed to contain symbolic vertex names
+nodes <- nodes[c(3, 1, 2, 4)]
+
+# create a graph object
+# graph_from_data_frame(d, directed = TRUE, vertices = NULL)
+# d: A data frame containing a symbolic edge list in the first two columns
+# vertices: A data frame containing vertex metadata
+# directed: no difference here since original data have a-b and b-a 2 pairs of records
+net <- graph_from_data_frame(d=edges, vertices=nodes, directed=TRUE)
+
+# requirement c
+# size of nodes(use [value] according to vignette doc)
+nodes$value <- strength(net)
+
+# create visNetwork object
+plot_visnetwork_nodes_1.1 <- visNetwork(nodes, edges) %>% 
+  # requirement d
+  visPhysics(solver="repulsion") %>%  
+  # requirement e
+  visOptions(highlightNearest = list(enabled = TRUE, degree=1), 
+             nodesIdSelection = TRUE) %>%
+  visLegend()
+```
+
+```{r 1.1_plot, echo=FALSE, fig.height=6, fig.width=8}
+# plot
+plot_visnetwork_nodes_1.1
+```
+
+## 1.2 Question:
+
+Add a functionality to the plot in step 1 that highlights all nodes that are connected to the
+selected node by a path of length one or two. Check some amount of the largest nodes and
+comment which individual has the best opportunity to spread the information in the
+network. Read some information about this person in Google and present your findings.
+
+### Answer:
+
+We copy the plot code from 1.1 and change the degree to 2, according to the plot, we find that 
+Jamal Zougam and Mohamed Chaoui have the best opportunity to spread the information in the network,
+just as we mentioned in 1.1.
+
+According to the information from [Wikipedia](https://en.wikipedia.org/wiki/Jamal_Zougam), Jamal Zougam and Mohamed Chaoui are Moroccan citizens, Jamal Zougam owned a mobile phone shop in Madrid and he is believed to be the person who sold telephones which were used to detonate the bombs in the attack. This mobile phone shop may 
+provide the meeting place for all other connected people, and provide a reasonable explanation
+why Jamal Zougam has the best opportunity to spread the information in the network.
+
+In addition, we also noticed that Mohamed Chaoui is not the main character in bunch of reports of 2004 Madrid train bombings, but according to [The Times](https://www.thetimes.com/article/focus-hunting-down-the-madrid-bombers-jl8k2zbgrh5), Jamal Zougam is half brother of Mohamed Chaoui, and both of them work in that mobile phone shop. So that's the reason why Mohamed Chaoui also has the best opportunity to spread the information in the network.
+
+```{r 1.2, echo=FALSE}
+###########################  Code For Assignment 1.2 ###########################
+# create visNetwork object
+plot_visnetwork_nodes_1.2 <- visNetwork(nodes, edges) %>% 
+  visPhysics(solver="repulsion") %>%  
+  visOptions(highlightNearest=list(enabled=TRUE, degree=2), 
+             nodesIdSelection = TRUE) %>%
+  visLegend()
+```
+
+```{r 1.2_plot, echo=FALSE, fig.height=6, fig.width=8}
+# plot
+plot_visnetwork_nodes_1.2
+```
+
+## 1.3 Question:
+
+Compute clusters by optimizing edge betweenness and visualize the resulting network.
+Comment whether the clusters you identified manually in step 1 were also discovered by this
+clustering method.
+
+### Answer:
+
+We change degree=1 again, and calculate the clusters using cluster_edge_betweenness function 
+from igraph package.
+
+Compare 2 plots from 1.1 and 1.3, we find that the cluster we identified manually in step 1 were discovered by this clustering method, but it also helped to identify two big clusters in that bunch of nodes in the middle part, which we can not find in step 1, and also found some small clusters.
+
+Regarding the two new clusters generated in the middle part, after reading some information using Google, we found that the cluster that Imad Eddin Barakat belongs to is for financial support and also functions as a coordinator while the cluster that Naima Oulad Akcha belongs to is mainly focused on helping prepare the materials and logistical Support for the attackand the attack itself.
+
+```{r 1.3, echo=FALSE}
+###########################  Code For Assignment 1.3 ###########################
+net <- graph_from_data_frame(d=edges, vertices=nodes, directed=FALSE)
+# compute clusters by optimizing edge betweenness
+clusters_1.3 <- cluster_edge_betweenness(net)
+nodes_1.3 <- nodes
+nodes_1.3$group <- clusters_1.3$membership
+
+plot_visnetwork_nodes_1.3 <- visNetwork(nodes_1.3, edges) %>% 
+  visPhysics(solver="repulsion") %>%  
+  visOptions(highlightNearest=list(enabled=TRUE, degree=1),
+             nodesIdSelection = TRUE) %>%
+  visLegend() 
+```
+
+```{r 1.3_plot, echo=FALSE}
+plot_visnetwork_nodes_1.3
+```
+
+## 1.4 Question:
+
+Use adjacency matrix representation to perform a permutation by Hierarchical Clustering
+(HC) seriation method and visualize the graph as a heatmap. Find the most pronounced
+cluster and comment whether this cluster was discovered in steps 1 or 3.
+
+### Answer:
+
+In the heatmap below, we found 5 clear clusters, from the top right to the bottom left.
+The first cluster we found is the cluster that Ivan Granadoc belongs to,
+The second cluster is the cluster that Mohanmed Bahaiah belongs to, 
+The third cluster is the cluster that Basel Ghayoun belongs to, 
+The fourth cluster is the cluster that Mohanmed EI Egipcio belongs to, 
+The last cluster is the cluster that Mohanmed Atta belongs to, 
+all of the clusters are identified in step 3.
+
+Comparing all the methods used in this assignment, we find that the clusters identified by optimizing edge betweenness are more informative than the other two methods and 
+can be used to identify clusters. However, we still need to find the cluster boundary manually(some kind of clear cluster boundary conditions).
+
+
+```{r 1.4, echo=FALSE,WARN=FALSE}
+###########################  Code For Assignment 1.4 ###########################
+# use the code provided along with the lecture ppt
+netm <- as_adjacency_matrix(net, attr="width", sparse=FALSE)
+colnames(netm) <- V(net)$label
+rownames(netm) <- V(net)$label
+
+# get the distance matrix 
+rowdist<-dist(netm)
+
+# order them
+order1<-seriate(rowdist, "HC")
+# Extracting Order Information 
+ord1<-get_order(order1)
+
+reordmatr<-netm[ord1,ord1]
+plot_heatmap_1.4 <- plot_ly(z=~reordmatr, x=~colnames(reordmatr), 
+        y=~rownames(reordmatr), type="heatmap")
+```
+
+```{r 1.4_plot, echo=FALSE}
+plot_heatmap_1.4
+```
+
+# Assignment 2: Trellis plots for population analysis
+
+The data file Oilcoal.csv provides time series about the consumption of oil (million tonnes) and coal
+(million tonnes oil equivalents) in China, India, Japan, US, Brazil, UK, Germany and France. Marker size
+shows how large a country is (1 for China and the US, 0.5 for all other countries).
+
+```{r setup2, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 2 ########################
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(tourr)
+```
+
+## 2.1 Question:
+
+Visualize data in Plotly as an animated bubble chart of Coal versus Oil in which the bubble size
+corresponds to the country size. List several noteworthy features of the investigated animation.
+
+### Answer:
+
+Because the value range in the data file is large(because of the different countries), 
+and we need to combine many countries in one plot, so we will use log scale to plot. 
+However, when x increase when we using log(x), small change in x will not change the 
+value a lot, so we will only focus on the big trend of those points.
+
+For the noteworthy features, we will use original data to help to interpret the plot.
+
+Founding from the plot are listed as following.
+
+1. China: Oil consumption is increasing(from 10 to 404) is much faster than coal consumption(from 165 to 1537).
+
+2. USA: No big change in oil and coal consumption.
+
+3. Countries like France(53 to 87), UK(74 to 77), Japan(87 to 244) and Germany(86 to 113), the oil consumption keep in a relative stable range.
+
+4. Brazil's oil consumption is increasing(from 14 to 100)
+
+5. Coal consumption of all countries is relative stable.
+
+This maybe because of the coal is an traditional energy source, and the technology of coal power plant is mature.
+
+6. In year 1980 to 1989, the oil consumption of all countries stop increase. But after that
+period, some countries' oil consumption continue to increase. 
+
+This maybe because of the following reasons: In the early 1980s, OPEC attempted to maintain high oil prices through production cuts. However, by the mid-1980s, the strategy failed, and oil prices collapsed in 1986.
+
+```{r 2.1, echo=FALSE}
+###########################  Code For Assignment 2.1 ###########################
+# read data,remove last empty column(name X)
+data2 <- read.csv("Oilcoal.csv", sep = ";", header = TRUE) %>% select(-X)
+
+# replace "," to "." in data if it is a number
+data2 <- data2 %>% 
+  mutate(Marker.size = as.numeric(gsub(",", ".", Marker.size))) %>%
+  mutate(Oil = as.numeric(gsub(",", ".", Oil))) %>%
+  mutate(Coal = as.numeric(gsub(",", ".", Coal)))
+
+# create a plotly object
+plot_2.1 <- plot_ly(data2, 
+                    x = ~log(Oil), y = ~log(Coal), 
+                    frame = ~Year, 
+                    type = 'scatter', 
+                    mode = 'markers',
+                    size = ~Marker.size,
+                    hovertext = ~Country,
+                    color = ~Country) %>%
+  animation_opts(frame = 500, easing = "cubic", redraw = FALSE)
+```
+
+```{r 2.1_plot, echo=FALSE}
+plot_2.1
+```
+
+## 2.2 Question:
+
+Find two countries that had similar motion patterns and create a motion chart including these
+countries only. Try to find historical facts that could explain some of the sudden changes in the
+animation behaviour.
+
+### Answer:
+
+After check the points in the plot in the previous exercises, we think France and the UK are
+two countries that had similar motion patterns.
+
+Because of the similar scale of the two countries, we can use the original data to plot.
+
+According to the plot, we found that the oil consumption of two countries increase at
+first, after 1973, the oil consumption decrease, which may because of the 1973 Oil Crisis.
+We also found the coal consumption of two countries decrease, this may because of the 
+green energy policy in the two countries.
+
+We also notice a gap between the two countries, which may be because of the different electricity 
+source, France has a lot of nuclear power plants, which is the main part of its electricity source.
+```{r 2.2, echo=FALSE}
+###########################  Code For Assignment 2.2 ###########################
+data2_2 <- data2 %>% filter(Country %in% c("France", "United Kingdom"))
+
+color_palette <- c("blue", "red")
+
+plot_2.2 <- plot_ly(data2_2, 
+                    x = ~Oil, y = ~Coal, 
+                    frame = ~Year, 
+                    type = 'scatter', 
+                    mode = 'markers',
+                    size = 5,
+                    color = ~Country,
+                    colors = color_palette) %>%
+  animation_opts(frame = 500, easing = "cubic", redraw = FALSE)
+
+plot_2.2
+```
+
+## 2.3 Question:
+
+Compute a new column that shows the proportion of fuel consumption related to oil: $Oil_{p} = \frac{Oil}{Oil+Coal} * 100$.
+One could think of visualizing the proportion of $Oil_p$ by means of animated bar chart; however smooth transitions between bars are not yet implemented in Plotly, Thus, use the following workaround:
+
+a. Create a new data frame that for each year and country contains two rows: one that
+shows $Oil_p$ and another row containing 0 in $Oil_p$ column
+
+b. Make an animated line plot of $Oil_p$  versus Country where you group  lines by Country and make them thicker
+
+Perform an analysis of this animation. What are the advantages of visualizing data in this way
+compared to the animated bubble chart? What are the disadvantages?
+
+### Answer:
+
+From the plot below, we can found the perspective of proportion of consumption.
+
+We note that Brazil's proportion of fuel consumption related to oil is keeping at
+around 90%, while other countries are changing over the years. 
+
+China's proportion is kept at a relatively low level, which is around 20%, this may be because China has large coal reserves and the people prefer to use coal as the main energy source instead of oil in many fields.
+
+For other countries, the proportion of fuel consumption related to oil has the trend
+of increasing across the years, which may be because of the increasing demand for oil in the industry.
+But this proportion keep in around 60%-70% for US,UK,Japan,Germany. But France's 
+proportion increase to around 90% which is much higher than other Europe country.
+
+The reason behind this may be that France’s energy policy has traditionally focused heavily on nuclear power rather than renewable. And since nuclear power does not use 
+oil or coal to generate electricity, the proportion of oil consumption in France is not affected by the need to generate electricity.
+
+Use proportion to show data is good for those who want to compare the proportion of the data between
+different objects, but it is not suitable, because the plot use a percentage value instead of 
+the real value, which means the pattern on the plot may be different from the real data,
+for example, in year 2009, Brazil consume 104.3 million tonnes, while at the same year, China consume 404 million tonnes. but the proportion of Brazil is 90% and China is 20%, which may make the user think that Brazil consume more oil than China, which is not true.
+
+```{r 2.3, echo=FALSE}
+###########################  Code For Assignment 2.3 ###########################
+# create new data column
+data2_3 <- data2 %>% 
+  mutate(oilp = Oil * 100 / (Oil + Coal)) 
+
+# create a new data frame, copy (Coal_0, oilp) to 2 rows
+data2_3 <- data2_3 %>% mutate(Coal_0 = 0)  %>%  
+           pivot_longer(cols = c(Coal_0, oilp)) %>% 
+           rename(oilp = value) %>% 
+           select(-name)
+
+plot_2.3 <- plot_ly(data2_3, 
+                    x = ~Country, y = ~oilp, 
+                    frame = ~Year, 
+                    type = 'scatter', 
+                    size = 20,
+                    mode = 'lines',
+                    line = list(width = 2),
+                    color = ~Country) %>%
+  animation_opts(frame = 200, easing = "cubic", redraw = F)
+
+plot_2.3
+```
+
+## 2.4 Question:
+
+Repeat the previous step but use “elastic” transition (easing). Which advantages and
+disadvantages can you see with this animation? Use information in https://easings.net/ to
+support your arguments.
+
+### Answer:
+
+After check the [document of easings](https://easings.net), we found that transition
+of the elastic easing is a bad choice for the animation of the line plot, because 
+the elastic easing have a bounce effect, which will make the plot hard to interpret.
+the user may interpret it as a sudden change in the data, which is not true.
+However, the cubic or most of the transitions are OK, except Back, Bounce and Elastic.
+
+```{r 2.4, echo=FALSE}
+###########################  Code For Assignment 2.4 ###########################
+plot_2.4 <- plot_ly(data2_3, 
+                    x = ~Country, y = ~oilp, 
+                    frame = ~Year, 
+                    type = 'scatter', 
+                    mode = 'lines',
+                    line = list(width = 2),
+                    color = ~Country) %>%
+  animation_opts(frame = 2000, easing = "elastic", redraw = FALSE)
+
+plot_2.4
+```
+
+## 2.5 Question:
+
+Use Plotly to create a guided 2D-tour visualizing Coal consumption in which the index function is
+given by Central Mass index and in which observations are years and variables are different
+countries. Find a projection with the most compact and well-separated clusters. Do clusters
+correspond to different Year ranges? Which variable has the largest contribution to this
+projection? How can this be interpreted? (Hint: make a time series plot for the Coal consumption
+of this country)
+
+### Answer:
+
+At step 0, we see a clear line in the 2D projection, and the two variables that contribute most to this projection are China and the US, which are much longer than all the other variables. Since there still have
+one point (1984) in the middle of this line, so we think this is not the best projection.
+
+At step 2.33 we found a relatively clear cluster projection, which has 2 clusters, and the most 3 variables to contribute to this projection are the US, Brazil and China, The axises lengths on the screen are 
+7.5cm, 6cm and 5.4cm respectively, this means US has the largest contribution to this projection.
+
+Regarding the clusters that correspond to different Year ranges, yes, we found 
+that one cluster is from 1965 to 1984 and the other from 1985 to 2008, we also 
+found one outlier point(2009)  
+
+We also make a time series plot for Coal consumption of those 3 countries, as follows.
+
+According to the time series plot, we found that the US coal consumption follow 
+a linear trend and very stable, except for a big drop in the year 2009.
+
+Brazil's coal consumption increased over the years, but in the year 1982 to 1985, it increased sharply from 5.9 to 9.8, which matches the cluster we found in the 2D projection.
+At year 2009, we also found a drop in coal consumption.
+
+Both the US and Brazil's 2009 drop in coal consumption may be the reason why we found an outlier point(2009) in the 2D projection. The reason behind this may be because of the financial crisis in 2008, which made coal consumption drop, also found that Natural gas prices began to drop significantly due to increased production from shale gas in the US.
+
+For China, its coal consumption increased smoothly till 2002, then increased sharply from 713 to 1537 in 2009. but this pattern does not show anything in our chosen 2D projection.
+
+```{r 2.5, echo=FALSE,message=FALSE, warning=FALSE,result="hide"}
+###########################  Code For Assignment 2.5 ###########################
+# make data frame for the tour, observations are years, variables are countries,
+# value is Coal, we need make sure only needed columns are in the data frame, 
+# otherwise dataframe will have issues, that means only 3 columns should be there
+data2_5 <- data2 %>%
+  select(-c(Marker.size,Oil)) %>%
+  pivot_wider(names_from = "Country", values_from = "Coal") 
+
+# the following code is copy from the code provided along with the lecture ppt
+# but we need to change tour_dat, and change state = data2_5$Year
+
+# column 1(year) should not be rescaled
+mat <- rescale(data2_5[,c(-1)])
+
+set.seed(12345)
+#tour <- new_tour(mat, grand_tour(), NULL)
+tour<- new_tour(mat, guided_tour(cmass), NULL)
+
+steps <- c(0, rep(1/15, 200))
+# capture.output to remove messages generated by this code
+capture.output({
+  Projs <- lapply(steps, function(step_size){
+    step <- tour(step_size)
+    if(is.null(step)) {
+      .GlobalEnv$tour <- new_tour(mat, guided_tour(cmass), NULL)
+      step <- tour(step_size)
+    }
+    return(step)
+  })
+}, file = "/dev/null")
+
+# projection of each observation
+tour_dat <- function(i) {
+  step <- Projs[[i]]
+  proj <- center(mat %*% step$proj)
+  data.frame(x = proj[,1], y = proj[,2], state = data2_5$Year) # change to year
+}
+
+# projection of each variable's axis
+proj_dat <- function(i) {
+  step <- Projs[[i]]
+  data.frame(
+    x = step$proj[,1], y = step$proj[,2], variable = colnames(mat)
+  )
+}
+
+stepz <- cumsum(steps)
+
+# tidy version of tour data
+tour_dats <- lapply(1:length(steps), tour_dat)
+tour_datz <- Map(function(x, y) cbind(x, step = y), tour_dats, stepz)
+tour_dat <- dplyr::bind_rows(tour_datz)
+
+# tidy version of tour projection data
+proj_dats <- lapply(1:length(steps), proj_dat)
+proj_datz <- Map(function(x, y) cbind(x, step = y), proj_dats, stepz)
+proj_dat <- dplyr::bind_rows(proj_datz)
+
+ax <- list(
+  title = "", showticklabels = FALSE,
+  zeroline = FALSE, showgrid = FALSE,
+  range = c(-1.1, 1.1)
+)
+
+# for nicely formatted slider labels
+options(digits = 3)
+tour_dat <- highlight_key(tour_dat, ~state, group = "A")
+tour <- proj_dat %>%
+  plot_ly(x = ~x, y = ~y, frame = ~step, color = I("black")) %>%
+  add_segments(xend = 0, yend = 0, color = I("gray80")) %>%
+  add_text(text = ~variable) %>%
+  add_markers(data = tour_dat, text = ~state, ids = ~state, hoverinfo = "text") %>%
+  layout(xaxis = ax, yaxis = ax)#%>%animation_opts(frame=0, transition=0, redraw = F)
+```
+
+```{r 2.5_plot,echo=FALSE}
+tour
+```
+
+```{r 2.5_ts_plot,echo=FALSE}
+###########################  Code For Assignment 2.5 Time Series ###############
+# make data frame for the time series plot(US,Brazil,China)
+data2_5_us_ts <- data2 %>% filter(Country == "US")
+data2_5_brazil_ts <- data2 %>% filter(Country == "Brazil")
+data2_5_china_ts <- data2 %>% filter(Country == "China")
+
+# plot
+plot_2_5_us_ts <- plot_ly(data2_5_us_ts, x = ~Year, y = ~Coal, 
+                       type = 'scatter', 
+                       mode = 'lines+markers') %>%
+  layout(title = "Time Series Plot of Coal Consumption of US",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Coal Consumption(million tonnes)"))
+plot_2_5_us_ts
+
+plot_2_5_brazil_ts <- plot_ly(data2_5_brazil_ts, x = ~Year, y = ~Coal, 
+                       type = 'scatter', 
+                       mode = 'lines+markers') %>%
+  layout(title = "Time Series Plot of Coal Consumption of Brazil",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Coal Consumption(million tonnes)"))
+plot_2_5_brazil_ts
+
+plot_2_5_china_ts <- plot_ly(data2_5_china_ts, x = ~Year, y = ~Coal, 
+                       type = 'scatter', 
+                       mode = 'lines+markers') %>%
+  layout(title = "Time Series Plot of Coal Consumption of China",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Coal Consumption(million tonnes)"))
+plot_2_5_china_ts
+```
+
+\newpage
+# Appendix: All code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```

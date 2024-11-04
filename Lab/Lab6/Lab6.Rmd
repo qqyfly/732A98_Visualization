@@ -1,0 +1,589 @@
+---
+title: "732A98-Visualization Lab 6"
+author: 
+  - Qinyuan Qi(qinqi464)
+date: "`r Sys.Date()`"
+output: html_document
+runtime: shiny
+---
+
+# Assignment 1: Text Visualization of Amazon reviews
+
+In this assignment you will analyze feedbacks given by customers for watches Casio AMW320R-1EV
+bought at www.amazon.com . Files Five.txt and OneTwo.txt contain feedbacks of the customers who
+were pleased and not pleased with their buy, respectively.
+
+```{r setup1, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 1 ########################
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(tidytext)
+library(wordcloud)
+library(visNetwork)
+library(RColorBrewer)
+library(textdata)
+library(shiny)
+```
+
+## 1.1 Question:
+
+Visualize word clouds corresponding to Five.txt and OneTwo.txt and make sure that stop words are removed.
+Which words are mentioned most often?
+
+### Answer:
+
+```{r 1.1, echo=FALSE}
+###########################  Code For Assignment 1.1 ###########################
+# This code use the code provided in the lecture as a reference
+# handle Five.txt
+# read text into a string vector
+five_text <- readLines("Five.txt") 
+textFrame_five_lines <- tibble(text=five_text) %>% mutate(line = row_number())
+
+# concatenate all lines into one string
+textFrame_five_single_string <- tibble(text=paste(five_text, collapse=" "))
+
+# one-token-per-row
+tidy_frame_five = textFrame_five_lines %>% unnest_tokens(output = word, input = text)
+
+# removing stopwords using anti_join, then count and sort.
+# stop_words is a predefined dataset
+tidy_frame_five_no_stopword <- tidy_frame_five %>% 
+                                anti_join(stop_words, by="word") %>% 
+                                count(word, sort=TRUE)
+
+# handle OneTwo.txt
+# read text file into string vector
+onetwo_text <- readLines("OneTwo.txt") 
+textFrame_onetwo_lines <- tibble(text=onetwo_text) %>% mutate(line = row_number())
+# concatenate all lines into one string
+textFrame_onetwo_text_single_string <- tibble(text = paste(onetwo_text, collapse=" "))
+# one-token-per-row
+tidy_frame_onetwo = textFrame_onetwo_lines %>% unnest_tokens(output = word, input = text)
+
+# removing stopwords, count and sort
+tidy_frame_onetwo_no_stopword <- tidy_frame_onetwo %>% 
+  anti_join(stop_words, by="word") %>% 
+  count(word, sort=TRUE)
+```
+
+```{r 1.1_plot1, echo=FALSE, fig.align = "center"}
+# makes the color palettes from ColorBrewer, function of RColorBrewer package
+pal <- brewer.pal(6,"Dark2")
+layout(matrix(c(1, 2), nrow=2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Wordcloud for the Five-dataset")
+tidy_frame_five_no_stopword %>% with(wordcloud(word, n, max.words = 100, 
+                                               colors=pal, random.order=F))
+```
+
+```{r 1.1_plot2, echo=FALSE, fig.align = "center"}
+# format the layout of wordcloud, center title etc
+layout(matrix(c(1, 2), nrow=2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Wordcloud for the OneTwo-dataset")
+tidy_frame_onetwo_no_stopword %>% with(wordcloud(word, n, max.words = 100, 
+                                               colors=pal, random.order=F))
+
+```
+
+The most mentioned words in Five.txt are (tidy_frame_five_no_stopword contains the information)
+
+|Freq Word |Count |
+|:--------:|:----:|
+|watch     |162   |
+|time      |36    |
+|casio     |32    |
+|price     |31    |
+|watches   |26    |
+
+The most mentioned words in OneTwo.txt are (tidy_frame_onetwo_no_stopword contains the information):
+
+|Freq Word |Count |
+|:--------:|:----:|
+|watch     |122   |
+|casio     |37    |
+|time      |37    |
+|amazon    |29    |
+|months    |21    |
+
+## 1.2 Question:
+
+Without filtering stop words, compute TF-IDF values for OneTwo.txt by aggregating
+each 10 lines into a separate “document”. Afterwards, compute mean TF-IDF values
+for each word over all documents and visualize them by the word cloud. 
+Compare the plot with the corresponding plot from step 1. What do you think the
+reason is behind word “watch” being not emphasized in TF-IDF diagram while it is 
+emphasized in the previous word clouds?
+
+### Answer:
+
+```{r 1.2, echo=FALSE}
+###########################  Code For Assignment 1.2 ###########################
+# This code use the code provided in the lecture as a reference
+# treating 10 lines as separate document
+TFIDF <- textFrame_onetwo_lines %>% unnest_tokens(word, text)%>%
+  mutate(line1=floor(line / 10)) %>%
+  count(line1,word, sort=TRUE) %>%
+  bind_tf_idf(word, line1, n)
+```
+
+```{r 1.2_plot, echo=FALSE, fig.align = "center", warning=FALSE}
+layout(matrix(c(1, 2), nrow=2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Wordcloud for the OneTwo-dataset based on TF-IDF(with stop words)")
+TFIDF %>% 
+  # internal grouping, output not change if print it, needed for summarise_at
+  group_by(word) %>% 
+  # calculate mean tf_idf for each word over all documents
+  summarise(avg_tfidf = mean(tf_idf)) %>%
+  arrange(desc(avg_tfidf)) %>% # reorder by avg_tfidf to get words we need
+  with(wordcloud(word, avg_tfidf, max.words = 100, colors = pal, random.order = FALSE))
+```
+
+We list the top 5 words with the highest TF-IDF values in OneTwo.txt:
+
+|Word           |avg_tfidf|
+|:-------------:|:-------:|
+|bad            |0.150    | 
+|could          |0.150    |
+|luminesence    |0.150    |
+|shockingly     |0.150    |
+|actual         |0.0546   |
+
+
+We found words like "shockingly", and "bad" appear on the wordcloud, which may reflect the 
+negative sentiment of the customers. 
+
+Compare with the wordcloud in 1.1, we did not see the word "watch" in the wordcloud in 1.2.
+The reasons behind this are:
+
+- Although this text is the user's comments on the watch, "watch" only appears 142 times compared to 4888 total words.
+
+- We split the original text into several documents(around 10 documents) without removing the stop words, and "watch" is only a small proportion of each document.
+
+- The reasons mentioned above make the word "watch" has a very low TF-IDF value(0 in this case).
+
+## 1.3 Question:
+
+Aggregate data in chunks of 5 lines and compute sentiment values (by using “afinn” database) for respective chunks in Five.txt and for OneTwo.txt . Produce plots visualizing aggregated sentiment values versus chunk index and make a comparative analysis between these plots. Does sentiment analysis show a connection of the corresponding documents to the kinds of reviews we expect to see in them?
+
+### Answer:
+
+The sentiment analysis plot shows connections of the corresponding documents to the kinds of reviews we expect. For Five.txt, the sentiment values are all positive, which is consistent with the expectation that the customers are pleased with their buy who rate 5 stars. For OneTwo.txt, some of the sentiment values are negative(6 of 21), some are zero(2 of 21) , and others are positive(13 of 21), but still lower than the sentiment values in Five.txt. This is consistent with the expectation that the customers are not pleased, but they will not write mean words to describe their feelings, they still express something good in their comments. We also checked the original text in OneTwo.txt, some of the comments like the following, which also confirm the previous view.
+
+- Sad, because I love the look. But it just doesn't seem to hold up!
+- This watch was ideal for me because I need a watch with big hands since my cataract surgery. I really wanted one with a metal band, but Casio stopped making that model a year ago. That means I'm stuck with a cheap rubber band that I will have to replace soon.
+- It's a shame because it's a really nice looking watch. Very disappointed. Also, you can't read it in the dark so that makes it useless to an extent. 
+
+```{r 1.3, echo=FALSE,message=FALSE}
+###########################  Code For Assignment 1.3 ###########################
+# This code use the code provided in the lecture as a reference
+tidy_frame_sentiment_five <- textFrame_five_lines%>%
+  unnest_tokens(word, text)%>%
+  left_join(get_sentiments("afinn"))%>%
+  mutate(line1=floor(line / 5))%>%
+  group_by(line1, sort=TRUE)%>%
+  # change to .groups = "drop" to avoid warning
+  summarize(Sentiment = sum(value, na.rm = TRUE), .groups = "drop")
+
+tidy_frame_sentiment_onetwo <- textFrame_onetwo_lines%>%
+  unnest_tokens(word, text)%>%
+  left_join(get_sentiments("afinn"))%>%
+  mutate(line1=floor(line / 5))%>%
+  group_by(line1, sort=TRUE)%>%
+  # change from summarize(Sentiment=sum(value, na.rm = T)) to the following one
+  # to avoid warning
+  summarize(Sentiment = sum(value, na.rm = TRUE), .groups = "drop")
+```
+
+```{r 1.3_plot, echo=FALSE}
+plot_ly(tidy_frame_sentiment_five, x=~line1, y=~Sentiment) %>% 
+  add_bars() %>%
+  layout(title = "Sentiment Analysis for Five.txt")
+
+plot_ly(tidy_frame_sentiment_onetwo, x=~line1, y=~Sentiment) %>% 
+  add_bars() %>%
+  layout(title = "Sentiment Analysis for OneTwo.txt")
+```
+
+## 1.4 Question:
+
+Create the phrase nets for Five.Txt and One.Txt with connector words
+
+- am, is, are, was, were
+- at
+
+When you find an interesting connection between some words, use Word Trees
+https://www.jasondavies.com/wordtree/ to understand the context better. Note that this
+link might not work properly in Microsoft Edge (if you are using Windows 10) so use other
+browsers.
+
+### Answer:
+
+
+```{r 1.4, echo=FALSE,WARN=FALSE}
+###########################  Code For Assignment 1.4 ###########################
+phraseNet=function(text, connectors, filename){
+  textFrame=tibble(text=paste(text, collapse=" "))
+  tidy_frame3=textFrame%>%unnest_tokens(word, text, token="ngrams", n=3)
+  tidy_frame3
+  tidy_frame_sep=tidy_frame3%>%separate(word, c("word1", "word2", "word3"), sep=" ")
+  
+  #SELECT SEPARATION WORDS HERE: now "is"/"are"
+  tidy_frame_filtered=tidy_frame_sep%>%
+    filter(word2 %in% connectors)%>%
+    filter(!word1 %in% stop_words$word)%>%
+    filter(!word3 %in% stop_words$word)
+  tidy_frame_filtered
+  
+  edges=tidy_frame_filtered%>%count(word1,word3, sort = T)%>%
+    rename(from=word1, to=word3, width=n)%>%
+    mutate(arrows="to")
+  
+  right_words=edges%>%count(word=to, wt=width)
+  left_words=edges%>%count(word=from, wt=width)
+  
+  #Computing node sizes and in/out degrees, colors.
+  nodes=left_words%>%full_join(right_words, by="word")%>%
+    replace_na(list(n.x=0, n.y=0))%>%
+    mutate(n.total=n.x+n.y)%>%
+    mutate(n.out=n.x-n.y)%>%
+    mutate(id=word, color=brewer.pal(9, "Blues")[cut_interval(n.out,9)],  font.size=40)%>%
+    rename(label=word, value=n.total)
+  
+  #FILTERING edges with no further connections - can be commented
+  edges=edges%>%left_join(nodes, c("from"= "id"))%>%
+    left_join(nodes, c("to"="id"))%>%
+    filter(value.x>1|value.y>1)%>%select(from,to,width,arrows)
+  
+  nodes=nodes%>%filter(id %in% edges$from |id %in% edges$to )
+  
+  visNetwork(nodes,edges)
+}
+```
+
+***Phrase Nets for Five.Txt with connector words: am, is, are, was, were***
+
+```{r 1.4_plot1, echo=FALSE, fig.align = "center"}
+phraseNet(five_text, c("am", "is", "are", "was", "were"))
+```
+
+***Phrase Nets for onetwo.txt with connector words: am, is, are, was, were***
+
+```{r 1.4_plot2, echo=FALSE, fig.align = "center"}
+phraseNet(onetwo_text, c("am", "is", "are", "was", "were"))
+```
+
+***Phrase Nets for Five.Txt with connector words: at***
+
+```{r 1.4_plot3, echo=FALSE, fig.align = "center"}
+phraseNet(five_text, c("at"))
+```
+***Phrase Nets for onetwo.txt with connector words: at***
+
+```{r 1.4_plot4, echo=FALSE, fig.align = "center"}
+phraseNet(onetwo_text, c("at"))
+```
+
+## 1.5 Question:
+
+Based on the graphs obtained in step 4, comment on the most interesting findings, like:
+
+- Which properties of this watch are mentioned mostly often?
+
+- What are satisfied customers talking about?
+
+- What are unsatisfied customers talking about?
+
+- What are properties of the watch mentioned by both groups?
+
+- Can you understand watch characteristics (like size of display, features of the watches) by observing these graphs?
+
+### Answer:
+
+According to the first 2 plots, we found several words are connected to the word "watch".
+
+The positive reviews are mostly about the following properties:
+Easy display, dial, functions and markers, exact times, night readable.
+
+The negative reviews are mostly about the following properties:
+Defective alarm, a useless display, night readable.
+
+The satisfied customers talked about the following:
+Simple, huge, awesome, durable materials, unbeatable,night readable
+
+The unsatisfied customers talking about the following:
+Defective alarm, stuck, useless display, blank display,glow night 
+
+The properties of the watch mentioned by both groups are about the display.
+Those who like it say it is easy(to read), but those who don't like it say it is blank and useless.
+and another property is night readable, it's watch hand may contain some glow materials which can be readable at night.
+
+By checking the plots, we can imagine this watch's dial has a digital display which will display something like big time markers, which are easy to read. However, some of the customers don't like it, and it seems there are some problems with the display, like blank or stuck bugs. 
+
+# Assignment 2: Interactive analysis of Italian olive oils
+
+In this assignment, you will continue analyzing data olive.csv that you started working with in lab 2.
+These data contain information about contents of olive oils coming from different regions in Italy.
+Each observation contains information about
+
+- Region (1=North, 2=South, 3= Sardinia island)
+
+- Area (different Italian regions)
+
+Different acids:
+
+- Palmitic
+- …
+- Eicosenoic
+
+In this assignment, you are assumed to use Plotly without Shiny.
+
+```{r setup2, include=FALSE, echo=FALSE}
+###########################  Init code For Assignment 2 ########################
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE)
+library(plotly)
+library(tidyr)
+library(dplyr)
+library(crosstalk)
+library(GGally)
+```
+
+## 2.1 Question:
+
+Create an interactive scatter plot of the eicosenoic against linoleic. You have probably
+found a group of observations having unusually low values of eicosenoic. Hover on these
+observations to find out the exact values of eicosenoic for these observations.
+
+
+### Answer:
+
+According to the plot below, we find a group of observations which have low 
+values of eicosenoic, those corresponding values of those points are 1,2 and 3.
+
+```{r 2.1, echo=FALSE}
+###########################  Code For Assignment 2.1 ###########################
+df_olive <- read.csv("olive.csv", header = TRUE)
+
+scatter_olive_eico_lino_2.1 <- df_olive %>% plot_ly() %>%
+  add_markers(x=~eicosenoic, y=~linoleic)
+
+scatter_olive_eico_lino_2.1
+```
+
+## 2.2 Question:
+
+Link the scatterplot of (eicosenoic, linoleic) to a bar chart showing Region and a slider
+that allows to filter the data by the values of stearic. Use persistent brushing to identify
+the regions that correspond unusually low values of eicosenoic. Use the slider and
+describe what additional relationships in the data can be found by using it. Report which
+interaction operators were used in this step.
+
+### Answer:
+
+When we link the bar chart and scatterplot, we found that the unusually low values of eicosanoids
+are existed in 3 regions, while the normal data is located in Region 1.
+
+Using the slide bar, we found that almost all of the unusually low values of eicosenoic existed 
+when Stearic Acid was 200 to 260. The corresponding bar chart plot did not show any significant pattern change when we changed the slider value.
+
+The interaction operators used in this step are:
+Connection and Selection operators.
+
+```{r 2.2, echo=FALSE,message=FALSE,}
+###########################  Code For Assignment 2.2 ###########################
+shared_olive_2.2 <- SharedData$new(df_olive)
+# Create a slider using crosstalk's filter_slider to filter data by stearic values
+filter_slider("stearic", "Stearic Acid", shared_olive_2.2, ~stearic, step = 0.5)
+
+# Scatter plot: Eicosenoic vs Linoleic
+scatter_olive_eico_lino_2.2 <- shared_olive_2.2 %>%
+  plot_ly(x = ~eicosenoic, y = ~linoleic, type = 'scatter', mode = 'markers') %>%
+  hide_legend() %>%
+  layout(title = "Scatterplot: Eicosenoic vs Linoleic", dragmode = "select")
+
+# Bar chart: Region
+bar_chart_region_2.2 <- shared_olive_2.2 %>%
+  plot_ly(x = ~Region, type = 'bar') %>%
+  layout(title = "Bar Chart: Region")
+
+subplot(scatter_olive_eico_lino_2.2,bar_chart_region_2.2)%>%
+  highlight(on="plotly_selected", dynamic=T, persistent = T, opacityDim = I(1)) %>%
+  hide_legend()
+```
+
+## 2.3 Question:
+
+Create linked scatter plots eicosenoic against linoleic and arachidic against linolenic.
+Which outliers in (arachidic, linolenic) are also outliers in (eicosenoic, linoleic)? Are
+outliers grouped in some way? Use brushing to demonstrate your findings.
+
+### Answer:
+
+From the plots below, those outliers that do not belong to the centre cluster in the scatter plot(arachidic vs linolenic) are also outliners in the scatter plot(eicosenoic vs linoleic).
+From the left plot, we can find at the bottom of the arachidic vs linolenic(left plot), there have 2 lines of outlier points, and we also notice some points located at the left top corner of left plot belong to outlier group.
+
+From the plot, we found that there existed many outlier points whose linolenic values were 0 or 10, much lower than the normal ones. And those corresponding outlier points in the scatter plot of eicosenoic vs linoleic shows that their value of eicosenoic are also extremely low.(1, 2 or 3)
+
+```{r 2.3, echo=FALSE,message=FALSE,warning=FALSE}
+###########################  Code For Assignment 2.3 ###########################
+shared_olive_2.3 <- SharedData$new(df_olive)
+
+# First scatterplot
+scatter_olive_eico_lino_2.3 <- shared_olive_2.3 %>%
+  plot_ly(x = ~eicosenoic, y = ~linoleic) %>% 
+  add_markers(color = I("black")) %>%
+  layout(title = "Scatterplot: Arachidic vs Linolenic and Eicosenoic vs Linoleic")
+
+# Second scatterplot
+scatter_olive_ara_lino_2.3 <- shared_olive_2.3 %>% 
+  plot_ly(x = ~arachidic, y = ~linolenic) %>%
+  add_markers(color = I("black")) %>%
+  hide_legend() %>%
+  layout(title = "")
+
+# Combine plots(only support one title here, so we combine title together)
+subplot(scatter_olive_ara_lino_2.3,scatter_olive_eico_lino_2.3) %>%
+  highlight(on = "plotly_selected", dynamic = TRUE, persistent = TRUE, opacityDim = I(1)) %>% 
+  hide_legend()
+
+```
+
+## 2.4 Question:
+
+Create a parallel coordinate plot for the available eight acids, a linked 3d-scatter plot in
+which variables are selected by three additional drop boxes and a linked bar chart
+showing Regions. Use persistent brushing to mark each region by a different colour.
+
+Observe the parallel coordinate plot and state which three variables (let’s call them
+influential variables) seem to be mostly reasonable to pick up if one wants to
+differentiate between the regions. Does the parallel coordinate plot demonstrate that
+there are clusters among the observations that belong to the same Region? Select the
+three influential variables in the drop boxes and observe in the 3d-plot whether each
+Region corresponds to one cluster.
+
+### Answer:
+
+parallel coordinate plot are too dense and can not show much information, like show 
+clusters among the observation.
+
+But according to the 3D scatter plot, we tried all the combinations of influential variables, and found 
+11 combinations that can differentiate between the clusters.And last element eicosenoic
+plays a key row, as it appear in all the combinations.oleic and linoleic are also important.
+
+Some of the combination of influential variables are:
+
+- palmitic,oleic,eicosenoic
+- palmitic,linoleic,eicosenoic
+- palmitoleic,oleic,eicosenoic
+- palmitoleic,linoleic,eicosenoic
+- palmitoleic,arachidic,eicosenoic
+
+```{r 2.4, echo=FALSE,fig.height=8}
+###########################  Code For Assignment 2.4 ###########################
+ui <- fluidPage(
+  titlePanel("Dynamic Feature Selection for Parallel Coordinates Plot"),
+  
+  # Move selection boxes to the top
+  fluidRow(
+    column(4, selectInput("feature1", "Feature 1", choices = names(df_olive)[4:11], selected = "palmitic")),
+    column(4, selectInput("feature2", "Feature 2", choices = names(df_olive)[4:11], selected = "palmitoleic")),
+    column(4, selectInput("feature3", "Feature 3", choices = names(df_olive)[4:11], selected = "stearic"))
+  ),
+  
+  # Main panel with both plots
+  fluidRow(
+    column(6, plotlyOutput("parallelPlot")),
+    column(6, plotlyOutput("scatterPlot"))
+  )
+)
+
+# Define Server logic
+server <- function(input, output, session) {
+  
+  # Create reactive data for selected features
+  selected_data <- reactive({
+    df_olive2 <- df_olive[, c("Region", input$feature1, input$feature2, input$feature3)]
+    df_olive2$.ID <- 1:nrow(df_olive2)
+    df_olive2
+  })
+  
+  # Parallel coordinate plot (dynamic based on selection)
+  output$parallelPlot <- renderPlotly({
+    parco <- ggparcoord(df_olive, columns = c(4:11))
+    parco_data <- plotly_data(ggplotly(parco))%>%group_by(.ID)
+    
+    parco_data_shared <- SharedData$new(parco_data, ~.ID, group="olive_group")
+    
+    plot_ly(parco_data_shared, x=~variable, y=~value)%>%
+      add_lines(line=list(width=0.3))%>%
+      add_markers(marker=list(size=0.3),text=~.ID, hoverinfo="text")
+  })
+  
+  # 3D scatter plot (based on dynamically selected features)
+  output$scatterPlot <- renderPlotly({
+    df_olive2 <- selected_data()
+    
+    # Share data with the same group
+    shared_olive <- SharedData$new(df_olive2, key = ~.ID, group = "olive_group")
+    
+    # Create 3D scatter plot
+    plot_ly(shared_olive,
+            x = ~get(input$feature1),
+            y = ~get(input$feature2),
+            z = ~get(input$feature3),
+            text = ~paste("ID:", .ID),
+            color = ~Region,  # Color by Region
+            type = "scatter3d",
+            mode = "markers",
+            marker = list(size = 5)) %>%
+      layout(scene = list(
+        xaxis = list(title = input$feature1),
+        yaxis = list(title = input$feature2),
+        zaxis = list(title = input$feature3)
+      ))
+  })
+}
+
+# Run the app
+shinyApp(ui = ui, server = server)
+```
+## 2.5 Question:
+
+Think about which interaction operators are available in step 4 and what interaction
+operands they are be applied to. Which additional interaction operators can be added to
+the visualization in step 4 to make it even more efficient/flexible? Based on the analysis
+in the previous steps, try to suggest a strategy (or, maybe, several strategies) that would
+use information about the level of acids to discover which regions different oils comes
+from.
+
+### Answer:
+
+Interaction operators available in step 4 are:
+- navigation operator
+- selection operator
+- connection operator
+- Reconfiguring operator
+
+Additional interaction operators can be added to the visualization in step 4 to 
+make it even more efficient/flexible:
+- Filtering operator(filter data to find more patterns)
+- Encoding operator(maybe not very helpful in this case)
+- Abstraction operator(may need add more different plots to show more information, instead of the current 2 plots)
+
+According the finding in 2.4, we can use the 3 most influential variables to differentiate between the regions,
+by just apply a logistic regression (or other classification algorithms) to the data using the 3 most influential variables as features, and the region as the target variable. Then we can use the model to predict the region of the olive oil based on the level of acids.(Since according to the 3D scatter plot, it already shows that
+the region can be clearly separated).
+
+\newpage
+# Appendix: All code for this report
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
